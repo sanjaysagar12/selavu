@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		});
 
 		try {
-			final List<SmsItem> sms = await _repository.getInboxSms();
+			final List<SmsItem> sms = await _repository.getBankTransactionSms();
 			setState(() {
 				_items = sms;
 				_isLoading = false;
@@ -86,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		}
 
 		if (_items.isEmpty) {
-			return const Center(child: Text('No SMS messages found.'));
+			return const Center(child: Text('No bank credit/debit SMS found.'));
 		}
 
 		return RefreshIndicator(
