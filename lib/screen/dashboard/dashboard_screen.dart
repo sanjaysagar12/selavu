@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:selavu/core/data/sms_repository.dart';
+import 'package:selavu/core/model/sms_payload.dart';
+import 'package:selavu/core/service/transaction_service.dart';
+import 'package:selavu/core/util/sms_hash.dart';
 import 'package:selavu/route.dart';
+import 'package:selavu/screen/transaction/add_expense_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
 	const DashboardScreen({super.key});
@@ -11,8 +15,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
 	final SmsRepository _repository = SmsRepository();
-	List<SmsItem> _items = <SmsItem>[];
-	DateFilter _dateFilter = DateFilter.all;
+	final TransactionService _transactionService = TransactionService();
+	List<SmsDisplayItem> _items = <SmsDisplayItem>[];
+	DateFilter _dateFilter = DateFilter.today;
 	DateTime? _selectedDate;
 	bool _isLoading = true;
 	String? _error;
@@ -31,8 +36,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 		try {
 			final List<SmsItem> sms = await _repository.getBankTransactionSms();
+			final List<String> hashes = sms
+				.map(
+					(SmsItem item) => computeSmsHash(
+						sender: item.sender,
+						body: item.body,
+						receivedAt: item.date,
+					),
+				)
+				.toList(growable: false);
+
+			final Set<String> tracked = await _transactionService.getTrackedSmsHashes(hashes);
+
+			final List<SmsDisplayItem> displayItems = <SmsDisplayItem>[];
+			for (int i = 0; i < sms.length; i++) {
+				final SmsItem item = sms[i];
+				final String hash = hashes[i];
+				displayItems.add(
+					SmsDisplayItem(
+						sms: item,
+						hash: hash,
+						tracked: tracked.contains(hash),
+					),
+				);
+			}
+
+			displayItems.sort((SmsDisplayItem a, SmsDisplayItem b) {
+				if (a.tracked != b.tracked) {
+					return a.tracked ? 1 : -1;
+				}
+				final DateTime aDate = a.sms.date ?? DateTime.fromMillisecondsSinceEpoch(0);
+				final DateTime bDate = b.sms.date ?? DateTime.fromMillisecondsSinceEpoch(0);
+				return bDate.compareTo(aDate);
+			});
+
 			setState(() {
-				_items = sms;
+				_items = displayItems;
 				_isLoading = false;
 			});
 		} catch (e) {
@@ -87,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 			);
 		}
 
-		final List<SmsItem> filteredItems = _applyDateFilter(_items);
+		final List<SmsDisplayItem> filteredItems = _applyDateFilter(_items);
 
 		return Column(
 			children: <Widget>[
@@ -173,6 +212,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 						],
 					),
 				),
+				Padding(
+					padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+					child: Text(
+						'Untracked expense on top',
+						style: Theme.of(context).textTheme.bodySmall,
+					),
+				),
 				Expanded(
 					child: filteredItems.isEmpty
 						? const Center(child: Text('No bank credit/debit SMS found.'))
@@ -182,10 +228,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 								itemCount: filteredItems.length,
 								separatorBuilder: (_, _) => const Divider(height: 1),
 								itemBuilder: (BuildContext context, int index) {
-									final SmsItem item = filteredItems[index];
+											final SmsDisplayItem item = filteredItems[index];
 									return ListTile(
+										onTap: () => Navigator.of(context).push(
+										MaterialPageRoute<bool?>(
+											builder: (_) => AddExpenseScreen(
+												smsPayload: SmsPayload(
+													sender: item.sms.sender,
+													body: item.sms.body,
+													receivedAt: item.sms.date,
+												),
+											),
+										),
+									),
 										title: Text(
-											item.sender,
+												item.sms.sender,
 											maxLines: 1,
 											overflow: TextOverflow.ellipsis,
 										),
@@ -193,13 +250,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 											crossAxisAlignment: CrossAxisAlignment.start,
 											children: <Widget>[
 												Text(
-													item.body,
+														item.sms.body,
 													maxLines: 2,
 													overflow: TextOverflow.ellipsis,
 												),
+													const SizedBox(height: 4),
+													Text(
+														item.tracked ? 'Tracked' : 'Untracked',
+														style: TextStyle(
+															color: item.tracked
+																? Theme.of(context).colorScheme.secondary
+																: Theme.of(context).colorScheme.error,
+															fontWeight: FontWeight.w600,
+														),
+													),
 												const SizedBox(height: 4),
 												Text(
-													_formatDate(item.date),
+														_formatDate(item.sms.date),
 													style: Theme.of(context).textTheme.labelMedium,
 												),
 											],
@@ -233,7 +300,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		});
 	}
 
-	List<SmsItem> _applyDateFilter(List<SmsItem> items) {
+	List<SmsDisplayItem> _applyDateFilter(List<SmsDisplayItem> items) {
 		if (_dateFilter == DateFilter.all) {
 			return items;
 		}
@@ -260,11 +327,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
 			return items;
 		}
 
-		return items.where((SmsItem item) {
-			if (item.date == null) {
+		return items.where((SmsDisplayItem item) {
+			if (item.sms.date == null) {
 				return false;
 			}
-			final DateTime itemDate = DateTime(item.date!.year, item.date!.month, item.date!.day);
+			final DateTime itemDate = DateTime(
+				item.sms.date!.year,
+				item.sms.date!.month,
+				item.sms.date!.day,
+			);
 			return itemDate == targetDate;
 		}).toList(growable: false);
 	}
@@ -294,5 +365,17 @@ enum DateFilter {
 	today,
 	yesterday,
 	custom,
+}
+
+class SmsDisplayItem {
+	const SmsDisplayItem({
+		required this.sms,
+		required this.hash,
+		required this.tracked,
+	});
+
+	final SmsItem sms;
+	final String hash;
+	final bool tracked;
 }
 

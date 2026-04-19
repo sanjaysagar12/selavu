@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'package:selavu/core/data/transaction_repository.dart';
+import 'package:selavu/core/model/sms_payload.dart';
 import 'package:selavu/core/service/transaction_service.dart';
+import 'package:selavu/core/util/sms_hash.dart';
 
 class AddExpenseScreen extends StatefulWidget {
-  const AddExpenseScreen({super.key});
+  const AddExpenseScreen({super.key, this.smsPayload});
+
+  final SmsPayload? smsPayload;
 
   @override
   State<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -42,6 +46,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   void initState() {
     super.initState();
     _loadLookups();
+    _prefillFromSms();
     _addSplitItem();
   }
 
@@ -69,9 +74,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final List<Category> categories = await _service.getExpenseCategories();
       final List<PaymentMethod> methods = await _service.getPaymentMethods();
 
+      int? selectedMethodId = _selectedPaymentMethodId;
+      if (widget.smsPayload != null && selectedMethodId == null) {
+        final PaymentMethod upi = methods.firstWhere(
+          (PaymentMethod method) => method.name.toLowerCase() == 'upi',
+          orElse: () => const PaymentMethod(id: -1, name: ''),
+        );
+        if (upi.id != -1) {
+          selectedMethodId = upi.id;
+        }
+      }
+
       setState(() {
         _categories = categories;
         _paymentMethods = methods;
+        _selectedPaymentMethodId = selectedMethodId;
         _isLoading = false;
       });
     } catch (e) {
@@ -80,6 +97,49 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  void _prefillFromSms() {
+    final SmsPayload? sms = widget.smsPayload;
+    if (sms == null) {
+      return;
+    }
+
+    if (_noteController.text.trim().isEmpty) {
+      _noteController.text = sms.body;
+    }
+
+    if (_amountController.text.trim().isEmpty) {
+      final double? amount = _extractAmountFromSms(sms.body);
+      if (amount != null) {
+        _amountController.text = amount.toStringAsFixed(2);
+      }
+    }
+  }
+
+  double? _extractAmountFromSms(String body) {
+    final RegExp rupeePattern = RegExp(
+      r'(?:inr|rs\.?|rs)\s*([0-9,]+(?:\.[0-9]{1,2})?)',
+      caseSensitive: false,
+    );
+    final RegExp reversePattern = RegExp(
+      r'([0-9,]+(?:\.[0-9]{1,2})?)\s*(?:inr|rs\.?|rs)',
+      caseSensitive: false,
+    );
+
+    final RegExpMatch? match = rupeePattern.firstMatch(body) ??
+        reversePattern.firstMatch(body);
+    if (match == null) {
+      return null;
+    }
+
+    final String raw = match.group(1) ?? '';
+    if (raw.isEmpty) {
+      return null;
+    }
+
+    final String normalized = raw.replaceAll(',', '');
+    return double.tryParse(normalized);
   }
 
   void _addSplitItem() {
@@ -240,11 +300,24 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     });
 
     try {
+      final SmsPayload? sms = widget.smsPayload;
+      final String? smsHash = sms == null
+          ? null
+          : computeSmsHash(
+              sender: sms.sender,
+              body: sms.body,
+              receivedAt: sms.receivedAt,
+            );
+
       await _service.addExpenseWithExtras(
         amount: amount,
         categoryId: _selectedCategoryId,
         paymentMethodId: _selectedPaymentMethodId,
         note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        smsHash: smsHash,
+        smsSender: sms?.sender,
+        smsBody: sms?.body,
+        smsReceivedAt: sms?.receivedAt,
         split: splitInput,
         loan: loanInput,
       );
@@ -345,6 +418,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
+        if (widget.smsPayload != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('Linked to SMS. Payment method set to UPI.'),
+          ),
         DropdownButtonFormField<int>(
           value: _selectedCategoryId,
           items: _categories

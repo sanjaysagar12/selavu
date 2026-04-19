@@ -91,6 +91,26 @@ class TransactionRepository {
     return db.insert('payment_methods', <String, Object?>{'name': trimmed});
   }
 
+  Future<Set<String>> getExistingSmsHashes(List<String> hashes) async {
+    if (hashes.isEmpty) {
+      return <String>{};
+    }
+
+    final Database db = await _database.database;
+    final String placeholders = List<String>.filled(hashes.length, '?').join(',');
+
+    final List<Map<String, Object?>> rows = await db.query(
+      'transactions',
+      columns: <String>['sms_hash'],
+      where: 'sms_hash IN ($placeholders)',
+      whereArgs: hashes,
+    );
+
+    return rows
+        .map((Map<String, Object?> row) => row['sms_hash'] as String)
+        .toSet();
+  }
+
   Future<int> insertTransaction({
     required String type,
     required double amount,

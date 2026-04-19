@@ -66,6 +66,10 @@ class TransactionService {
     return _repository.addPaymentMethod(name);
   }
 
+  Future<Set<String>> getTrackedSmsHashes(List<String> hashes) {
+    return _repository.getExistingSmsHashes(hashes);
+  }
+
   Future<int> addExpense({required double amount, String? note}) {
     _validateAmount(amount);
     return _repository.insertTransaction(
@@ -80,6 +84,10 @@ class TransactionService {
     int? categoryId,
     int? paymentMethodId,
     String? note,
+    String? smsHash,
+    String? smsSender,
+    String? smsBody,
+    DateTime? smsReceivedAt,
     SplitTransactionInput? split,
     LoanTransactionInput? loan,
   }) async {
@@ -91,6 +99,10 @@ class TransactionService {
       categoryId: categoryId,
       paymentMethodId: paymentMethodId,
       note: note,
+      smsHash: smsHash,
+      smsSender: smsSender,
+      smsBody: smsBody,
+      smsReceivedAt: smsReceivedAt,
     );
 
     if (split != null) {
