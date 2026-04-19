@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:selavu/core/data/sms_repository.dart';
+import 'package:selavu/route.dart';
 
 class DashboardScreen extends StatefulWidget {
 	const DashboardScreen({super.key});
@@ -10,7 +11,6 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
 	final SmsRepository _repository = SmsRepository();
-
 	List<SmsItem> _items = <SmsItem>[];
 	DateFilter _dateFilter = DateFilter.all;
 	DateTime? _selectedDate;
@@ -91,6 +91,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 		return Column(
 			children: <Widget>[
+				Padding(
+					padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+					child: Row(
+						children: <Widget>[
+							Expanded(
+								child: FilledButton.icon(
+									onPressed: () => Navigator.of(context).pushNamed(
+										AppRoutes.addExpense,
+									),
+									icon: const Icon(Icons.remove_circle_outline),
+									label: const Text('Spent'),
+								),
+							),
+							const SizedBox(width: 12),
+							Expanded(
+								child: FilledButton.icon(
+									onPressed: () => Navigator.of(context).pushNamed(
+										AppRoutes.addIncome,
+									),
+									icon: const Icon(Icons.add_circle_outline),
+									label: const Text('Received'),
+								),
+							),
+						],
+					),
+				),
 				Padding(
 					padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
 					child: Row(
@@ -260,6 +286,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		final String twoDigitMinute = date.minute.toString().padLeft(2, '0');
 		return '${date.year}-$twoDigitMonth-$twoDigitDay $twoDigitHour:$twoDigitMinute';
 	}
+
 }
 
 enum DateFilter {
@@ -268,3 +295,4 @@ enum DateFilter {
 	yesterday,
 	custom,
 }
+
