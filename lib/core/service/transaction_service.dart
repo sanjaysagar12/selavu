@@ -74,6 +74,20 @@ class TransactionService {
     return _repository.getExistingSmsHashes(hashes);
   }
 
+  Future<double> getTodayExpenseTotal() {
+    final DateTime now = DateTime.now();
+    final DateTime start = DateTime(now.year, now.month, now.day);
+    final DateTime end = start.add(const Duration(days: 1));
+    return _repository.getExpenseTotalBetween(start: start, end: end);
+  }
+
+  Future<double> getMonthExpenseTotal() {
+    final DateTime now = DateTime.now();
+    final DateTime start = DateTime(now.year, now.month, 1);
+    final DateTime end = DateTime(now.year, now.month + 1, 1);
+    return _repository.getExpenseTotalBetween(start: start, end: end);
+  }
+
   Future<int> updateTransaction({
     required int id,
     required String type,

@@ -216,6 +216,32 @@ ORDER BY t.transaction_date DESC
     );
   }
 
+  Future<double> getExpenseTotalBetween({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+SELECT SUM(amount) AS total
+FROM transactions
+WHERE type = 'expense'
+  AND transaction_date >= ?
+  AND transaction_date < ?
+''',
+      <Object?>[
+        start.toIso8601String(),
+        end.toIso8601String(),
+      ],
+    );
+
+    final Object? value = rows.isNotEmpty ? rows.first['total'] : null;
+    if (value == null) {
+      return 0;
+    }
+    return (value as num).toDouble();
+  }
+
   Future<int> insertTransaction({
     required String type,
     required double amount,

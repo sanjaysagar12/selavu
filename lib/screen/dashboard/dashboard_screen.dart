@@ -19,6 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 	final SmsRepository _repository = SmsRepository();
 	final TransactionService _transactionService = TransactionService();
 	List<DashboardItem> _items = <DashboardItem>[];
+	double _todayExpenseTotal = 0;
+	double _monthExpenseTotal = 0;
 	DateFilter _dateFilter = DateFilter.today;
 	DateTime? _selectedDate;
 	bool _isLoading = true;
@@ -50,6 +52,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 			final Set<String> tracked = await _transactionService.getTrackedSmsHashes(hashes);
 			final List<TransactionItem> transactions = await _transactionService.getTransactions();
+			final double todayTotal = await _transactionService.getTodayExpenseTotal();
+			final double monthTotal = await _transactionService.getMonthExpenseTotal();
 
 			final List<DashboardItem> displayItems = <DashboardItem>[];
 			for (int i = 0; i < sms.length; i++) {
@@ -84,6 +88,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 			setState(() {
 				_items = displayItems;
+				_todayExpenseTotal = todayTotal;
+				_monthExpenseTotal = monthTotal;
 				_isLoading = false;
 			});
 		} catch (e) {
@@ -142,6 +148,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 		return Column(
 			children: <Widget>[
+				Padding(
+					padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+					child: Row(
+						children: <Widget>[
+							Expanded(
+								child: _buildExpenseSummaryCard(
+									label: 'Today Expense',
+									amount: _todayExpenseTotal,
+								),
+							),
+							const SizedBox(width: 12),
+							Expanded(
+								child: _buildExpenseSummaryCard(
+									label: 'This Month',
+									amount: _monthExpenseTotal,
+								),
+							),
+						],
+					),
+				),
 				Padding(
 					padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
 					child: Row(
@@ -341,6 +367,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
 						),
 				),
 			],
+		);
+	}
+
+	Widget _buildExpenseSummaryCard({
+		required String label,
+		required double amount,
+	}) {
+		return Container(
+			padding: const EdgeInsets.all(12),
+			decoration: BoxDecoration(
+				color: Theme.of(context).colorScheme.surfaceContainerHighest,
+				borderRadius: BorderRadius.circular(12),
+			),
+			child: Column(
+				crossAxisAlignment: CrossAxisAlignment.start,
+				children: <Widget>[
+					Text(
+						label,
+						style: Theme.of(context).textTheme.labelMedium,
+					),
+					const SizedBox(height: 6),
+					Text(
+						amount.toStringAsFixed(2),
+						style: Theme.of(context).textTheme.titleMedium?.copyWith(
+							fontWeight: FontWeight.w700,
+						),
+					),
+				],
+			),
 		);
 	}
 
