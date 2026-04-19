@@ -24,6 +24,38 @@ class PaymentMethod {
   final String name;
 }
 
+class TransactionItem {
+  const TransactionItem({
+    required this.id,
+    required this.type,
+    required this.amount,
+    required this.note,
+    required this.transactionDate,
+    required this.categoryName,
+    required this.paymentMethodName,
+    required this.categoryId,
+    required this.paymentMethodId,
+    required this.smsHash,
+    required this.smsSender,
+    required this.smsBody,
+    required this.smsReceivedAt,
+  });
+
+  final int id;
+  final String type;
+  final double amount;
+  final String? note;
+  final DateTime? transactionDate;
+  final String? categoryName;
+  final String? paymentMethodName;
+  final int? categoryId;
+  final int? paymentMethodId;
+  final String? smsHash;
+  final String? smsSender;
+  final String? smsBody;
+  final DateTime? smsReceivedAt;
+}
+
 class TransactionRepository {
   TransactionRepository({AppDatabase? database})
       : _database = database ?? AppDatabase.instance;
@@ -109,6 +141,79 @@ class TransactionRepository {
     return rows
         .map((Map<String, Object?> row) => row['sms_hash'] as String)
         .toSet();
+  }
+
+  Future<List<TransactionItem>> getTransactions() async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery('''
+SELECT
+  t.id,
+  t.type,
+  t.amount,
+  t.note,
+  t.transaction_date,
+  t.category_id,
+  t.payment_method_id,
+  t.sms_hash,
+  t.sms_sender,
+  t.sms_body,
+  t.sms_received_at,
+  c.name AS category_name,
+  pm.name AS payment_method_name
+FROM transactions t
+LEFT JOIN categories c ON c.id = t.category_id
+LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id
+ORDER BY t.transaction_date DESC
+''');
+
+    return rows
+        .map(
+          (Map<String, Object?> row) => TransactionItem(
+            id: row['id'] as int,
+            type: row['type'] as String,
+            amount: (row['amount'] as num).toDouble(),
+            note: row['note'] as String?,
+            transactionDate: row['transaction_date'] == null
+                ? null
+                : DateTime.tryParse(row['transaction_date'] as String),
+            categoryId: row['category_id'] as int?,
+            paymentMethodId: row['payment_method_id'] as int?,
+            smsHash: row['sms_hash'] as String?,
+            smsSender: row['sms_sender'] as String?,
+            smsBody: row['sms_body'] as String?,
+            smsReceivedAt: row['sms_received_at'] == null
+                ? null
+                : DateTime.tryParse(row['sms_received_at'] as String),
+            categoryName: row['category_name'] as String?,
+            paymentMethodName: row['payment_method_name'] as String?,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<int> updateTransaction({
+    required int id,
+    required String type,
+    required double amount,
+    int? categoryId,
+    int? paymentMethodId,
+    String? note,
+  }) async {
+    final Database db = await _database.database;
+
+    return db.update(
+      'transactions',
+      <String, Object?>{
+        'type': type,
+        'amount': amount,
+        'category_id': categoryId,
+        'payment_method_id': paymentMethodId,
+        'note': note,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: <Object?>[id],
+    );
   }
 
   Future<int> insertTransaction({

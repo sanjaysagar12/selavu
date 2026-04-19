@@ -80,7 +80,7 @@ class SmsRepository {
         .toList(growable: false);
   }
 
-  Future<List<SmsItem>> getBankTransactionSms() async {
+  Future<List<SmsItem>> getBankTransactionMessages() async {
     final List<SmsItem> allMessages = await getInboxSms();
     return allMessages.where(_isBankTransactionSms).toList(growable: false);
   }

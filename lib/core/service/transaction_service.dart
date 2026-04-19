@@ -66,8 +66,31 @@ class TransactionService {
     return _repository.addPaymentMethod(name);
   }
 
+  Future<List<TransactionItem>> getTransactions() {
+    return _repository.getTransactions();
+  }
+
   Future<Set<String>> getTrackedSmsHashes(List<String> hashes) {
     return _repository.getExistingSmsHashes(hashes);
+  }
+
+  Future<int> updateTransaction({
+    required int id,
+    required String type,
+    required double amount,
+    int? categoryId,
+    int? paymentMethodId,
+    String? note,
+  }) {
+    _validateAmount(amount);
+    return _repository.updateTransaction(
+      id: id,
+      type: type,
+      amount: amount,
+      categoryId: categoryId,
+      paymentMethodId: paymentMethodId,
+      note: note,
+    );
   }
 
   Future<int> addExpense({required double amount, String? note}) {

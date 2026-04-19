@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:selavu/core/data/sms_repository.dart';
+import 'package:selavu/core/data/transaction_repository.dart';
 import 'package:selavu/core/model/sms_payload.dart';
 import 'package:selavu/core/service/transaction_service.dart';
 import 'package:selavu/core/util/sms_hash.dart';
 import 'package:selavu/route.dart';
 import 'package:selavu/screen/transaction/add_expense_screen.dart';
+import 'package:selavu/screen/transaction/transaction_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
 	const DashboardScreen({super.key});
@@ -16,7 +18,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
 	final SmsRepository _repository = SmsRepository();
 	final TransactionService _transactionService = TransactionService();
-	List<SmsDisplayItem> _items = <SmsDisplayItem>[];
+	List<DashboardItem> _items = <DashboardItem>[];
 	DateFilter _dateFilter = DateFilter.today;
 	DateTime? _selectedDate;
 	bool _isLoading = true;
@@ -25,17 +27,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 	@override
 	void initState() {
 		super.initState();
-		_loadSms();
+		_loadDashboardData();
 	}
 
-	Future<void> _loadSms() async {
+	Future<void> _loadDashboardData() async {
 		setState(() {
 			_isLoading = true;
 			_error = null;
 		});
 
 		try {
-			final List<SmsItem> sms = await _repository.getBankTransactionSms();
+			final List<SmsItem> sms = await _repository.getBankTransactionMessages();
 			final List<String> hashes = sms
 				.map(
 					(SmsItem item) => computeSmsHash(
@@ -47,26 +49,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 				.toList(growable: false);
 
 			final Set<String> tracked = await _transactionService.getTrackedSmsHashes(hashes);
+			final List<TransactionItem> transactions = await _transactionService.getTransactions();
 
-			final List<SmsDisplayItem> displayItems = <SmsDisplayItem>[];
+			final List<DashboardItem> displayItems = <DashboardItem>[];
 			for (int i = 0; i < sms.length; i++) {
 				final SmsItem item = sms[i];
 				final String hash = hashes[i];
+				if (!tracked.contains(hash)) {
+					displayItems.add(
+						DashboardItem.sms(
+							sms: item,
+							hash: hash,
+						),
+					);
+				}
+			}
+
+			for (final TransactionItem transaction in transactions) {
 				displayItems.add(
-					SmsDisplayItem(
-						sms: item,
-						hash: hash,
-						tracked: tracked.contains(hash),
-					),
+					DashboardItem.transaction(transaction: transaction),
 				);
 			}
 
-			displayItems.sort((SmsDisplayItem a, SmsDisplayItem b) {
-				if (a.tracked != b.tracked) {
-					return a.tracked ? 1 : -1;
+			displayItems.sort((DashboardItem a, DashboardItem b) {
+				if (a.kind != b.kind) {
+					return a.kind == DashboardItemKind.sms ? -1 : 1;
 				}
-				final DateTime aDate = a.sms.date ?? DateTime.fromMillisecondsSinceEpoch(0);
-				final DateTime bDate = b.sms.date ?? DateTime.fromMillisecondsSinceEpoch(0);
+				final DateTime aDate = _getItemDate(a) ??
+					DateTime.fromMillisecondsSinceEpoch(0);
+				final DateTime bDate = _getItemDate(b) ??
+					DateTime.fromMillisecondsSinceEpoch(0);
 				return bDate.compareTo(aDate);
 			});
 
@@ -89,7 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 				title: const Text('Dashboard'),
 				actions: <Widget>[
 					IconButton(
-						onPressed: _loadSms,
+						onPressed: _loadDashboardData,
 						icon: const Icon(Icons.refresh),
 						tooltip: 'Refresh',
 					),
@@ -117,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 							),
 							const SizedBox(height: 12),
 							FilledButton(
-								onPressed: _loadSms,
+								onPressed: _loadDashboardData,
 								child: const Text('Try Again'),
 							),
 						],
@@ -126,7 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 			);
 		}
 
-		final List<SmsDisplayItem> filteredItems = _applyDateFilter(_items);
+		final List<DashboardItem> filteredItems = _applyDateFilter(_items);
 
 		return Column(
 			children: <Widget>[
@@ -215,64 +227,115 @@ class _DashboardScreenState extends State<DashboardScreen> {
 				Padding(
 					padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
 					child: Text(
-						'Untracked expense on top',
+						'Untracked SMS on top. Tracked items show from transactions.',
 						style: Theme.of(context).textTheme.bodySmall,
 					),
 				),
 				Expanded(
 					child: filteredItems.isEmpty
-						? const Center(child: Text('No bank credit/debit SMS found.'))
+						? const Center(child: Text('No untracked SMS or transactions found.'))
 						: RefreshIndicator(
-							onRefresh: _loadSms,
+							onRefresh: _loadDashboardData,
 							child: ListView.separated(
 								itemCount: filteredItems.length,
 								separatorBuilder: (_, _) => const Divider(height: 1),
 								itemBuilder: (BuildContext context, int index) {
-											final SmsDisplayItem item = filteredItems[index];
-									return ListTile(
-										onTap: () => Navigator.of(context).push(
-										MaterialPageRoute<bool?>(
-											builder: (_) => AddExpenseScreen(
-												smsPayload: SmsPayload(
-													sender: item.sms.sender,
-													body: item.sms.body,
-													receivedAt: item.sms.date,
-												),
-											),
-										),
-									),
-										title: Text(
-												item.sms.sender,
-											maxLines: 1,
-											overflow: TextOverflow.ellipsis,
-										),
-										subtitle: Column(
-											crossAxisAlignment: CrossAxisAlignment.start,
-											children: <Widget>[
-												Text(
-														item.sms.body,
-													maxLines: 2,
-													overflow: TextOverflow.ellipsis,
-												),
-													const SizedBox(height: 4),
-													Text(
-														item.tracked ? 'Tracked' : 'Untracked',
-														style: TextStyle(
-															color: item.tracked
-																? Theme.of(context).colorScheme.secondary
-																: Theme.of(context).colorScheme.error,
-															fontWeight: FontWeight.w600,
+											final DashboardItem item = filteredItems[index];
+											if (item.kind == DashboardItemKind.sms) {
+												final SmsItem sms = item.sms!;
+												return ListTile(
+													onTap: () => Navigator.of(context).push(
+													MaterialPageRoute<bool?>(
+														builder: (_) => AddExpenseScreen(
+															smsPayload: SmsPayload(
+																sender: sms.sender,
+																body: sms.body,
+																receivedAt: sms.date,
+															),
 														),
 													),
-												const SizedBox(height: 4),
-												Text(
-														_formatDate(item.sms.date),
-													style: Theme.of(context).textTheme.labelMedium,
 												),
-											],
-										),
-										isThreeLine: true,
-									);
+												title: Text(
+													sms.sender,
+													maxLines: 1,
+													overflow: TextOverflow.ellipsis,
+												),
+												subtitle: Column(
+													crossAxisAlignment: CrossAxisAlignment.start,
+													children: <Widget>[
+														Text(
+															sms.body,
+															maxLines: 2,
+															overflow: TextOverflow.ellipsis,
+														),
+														const SizedBox(height: 4),
+														Text(
+															'Untracked',
+															style: TextStyle(
+																color: Theme.of(context).colorScheme.error,
+																fontWeight: FontWeight.w600,
+															),
+														),
+														const SizedBox(height: 4),
+														Text(
+															_formatDate(sms.date),
+															style: Theme.of(context).textTheme.labelMedium,
+														),
+													],
+												),
+												isThreeLine: true,
+											);
+											}
+
+											final TransactionItem transaction = item.transaction!;
+											final bool isIncome = transaction.type == 'income';
+											final String amountLabel =
+												'${isIncome ? '+' : '-'}${transaction.amount.toStringAsFixed(2)}';
+											final String title = transaction.categoryName ??
+												(transaction.note?.isNotEmpty == true ? transaction.note! : 'Transaction');
+
+											return ListTile(
+												onTap: () async {
+												final bool? updated = await Navigator.of(context).push(
+													MaterialPageRoute<bool>(
+														builder: (_) => TransactionDetailScreen(
+															transaction: transaction,
+														),
+													),
+												);
+												if (updated == true && context.mounted) {
+													await _loadDashboardData();
+												}
+											},
+												title: Text(
+													title,
+													maxLines: 1,
+													overflow: TextOverflow.ellipsis,
+												),
+												subtitle: Column(
+													crossAxisAlignment: CrossAxisAlignment.start,
+													children: <Widget>[
+														Text(
+															transaction.paymentMethodName ?? 'Payment method',
+														),
+														const SizedBox(height: 4),
+														Text(
+															_formatDate(transaction.transactionDate),
+															style: Theme.of(context).textTheme.labelMedium,
+														),
+													],
+												),
+												trailing: Text(
+													amountLabel,
+													style: TextStyle(
+														color: isIncome
+															? Theme.of(context).colorScheme.secondary
+															: Theme.of(context).colorScheme.error,
+														fontWeight: FontWeight.w600,
+													),
+												),
+												isThreeLine: true,
+											);
 								},
 							),
 						),
@@ -300,7 +363,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		});
 	}
 
-	List<SmsDisplayItem> _applyDateFilter(List<SmsDisplayItem> items) {
+	List<DashboardItem> _applyDateFilter(List<DashboardItem> items) {
 		if (_dateFilter == DateFilter.all) {
 			return items;
 		}
@@ -327,17 +390,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 			return items;
 		}
 
-		return items.where((SmsDisplayItem item) {
-			if (item.sms.date == null) {
+		return items.where((DashboardItem item) {
+			final DateTime? itemDate = _getItemDate(item);
+			if (itemDate == null) {
 				return false;
 			}
-			final DateTime itemDate = DateTime(
-				item.sms.date!.year,
-				item.sms.date!.month,
-				item.sms.date!.day,
+			final DateTime normalized = DateTime(
+				itemDate.year,
+				itemDate.month,
+				itemDate.day,
 			);
-			return itemDate == targetDate;
+			return normalized == targetDate;
 		}).toList(growable: false);
+	}
+
+	DateTime? _getItemDate(DashboardItem item) {
+		if (item.kind == DashboardItemKind.sms) {
+			return item.sms?.date;
+		}
+		return item.transaction?.transactionDate;
 	}
 
 	String _formatDateShort(DateTime date) {
@@ -367,15 +438,27 @@ enum DateFilter {
 	custom,
 }
 
-class SmsDisplayItem {
-	const SmsDisplayItem({
+class DashboardItem {
+	const DashboardItem.sms({
 		required this.sms,
 		required this.hash,
-		required this.tracked,
-	});
+	})  : kind = DashboardItemKind.sms,
+			transaction = null;
 
-	final SmsItem sms;
-	final String hash;
-	final bool tracked;
+	const DashboardItem.transaction({
+		required this.transaction,
+	})  : kind = DashboardItemKind.transaction,
+			sms = null,
+			hash = null;
+
+	final DashboardItemKind kind;
+	final SmsItem? sms;
+	final String? hash;
+	final TransactionItem? transaction;
+}
+
+enum DashboardItemKind {
+	sms,
+	transaction,
 }
 
