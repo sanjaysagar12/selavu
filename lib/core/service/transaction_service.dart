@@ -74,6 +74,13 @@ class TransactionService {
     return _repository.getExistingSmsHashes(hashes);
   }
 
+  Future<double> getExpenseTotalBetween({
+    required DateTime start,
+    required DateTime end,
+  }) {
+    return _repository.getExpenseTotalBetween(start: start, end: end);
+  }
+
   Future<double> getTodayExpenseTotal() {
     final DateTime now = DateTime.now();
     final DateTime start = DateTime(now.year, now.month, now.day);

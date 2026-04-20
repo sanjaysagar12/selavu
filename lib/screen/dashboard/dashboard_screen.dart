@@ -7,6 +7,7 @@ import 'package:selavu/core/util/sms_hash.dart';
 import 'package:selavu/route.dart';
 import 'package:selavu/screen/transaction/add_expense_screen.dart';
 import 'package:selavu/screen/transaction/transaction_detail_screen.dart';
+import 'package:selavu/screen/dashboard/widgets/expense_hero_card.dart';
 
 class DashboardScreen extends StatefulWidget {
 	const DashboardScreen({super.key});
@@ -19,10 +20,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 	final SmsRepository _repository = SmsRepository();
 	final TransactionService _transactionService = TransactionService();
 	List<DashboardItem> _items = <DashboardItem>[];
-	double _todayExpenseTotal = 0;
+	double _rangeExpenseTotal = 0;
 	double _monthExpenseTotal = 0;
-	DateFilter _dateFilter = DateFilter.today;
-	DateTime? _selectedDate;
+	ExpenseRange _expenseRange = ExpenseRange.today;
 	bool _isLoading = true;
 	String? _error;
 
@@ -52,7 +52,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 			final Set<String> tracked = await _transactionService.getTrackedSmsHashes(hashes);
 			final List<TransactionItem> transactions = await _transactionService.getTransactions();
-			final double todayTotal = await _transactionService.getTodayExpenseTotal();
+			final DateTimeRange range = _getExpenseRangeDates(_expenseRange);
+			final double rangeTotal = await _transactionService.getExpenseTotalBetween(
+				start: range.start,
+				end: range.end,
+			);
 			final double monthTotal = await _transactionService.getMonthExpenseTotal();
 
 			final List<DashboardItem> displayItems = <DashboardItem>[];
@@ -88,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 			setState(() {
 				_items = displayItems;
-				_todayExpenseTotal = todayTotal;
+				_rangeExpenseTotal = rangeTotal;
 				_monthExpenseTotal = monthTotal;
 				_isLoading = false;
 			});
@@ -103,16 +107,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 	@override
 	Widget build(BuildContext context) {
 		return Scaffold(
-			appBar: AppBar(
-				title: const Text('Dashboard'),
-				actions: <Widget>[
-					IconButton(
-						onPressed: _loadDashboardData,
-						icon: const Icon(Icons.refresh),
-						tooltip: 'Refresh',
-					),
-				],
-			),
 			body: _buildBody(context),
 		);
 	}
@@ -148,113 +142,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 		return Column(
 			children: <Widget>[
+				ExpenseHeroCard(
+					monthTotal: _monthExpenseTotal,
+					periodTotal: _rangeExpenseTotal,
+					range: _expenseRange,
+					onRangeChanged: _handleExpenseRangeChange,
+				),
 				Padding(
-					padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+					padding: const EdgeInsets.fromLTRB(16, 28, 16, 8),
 					child: Row(
 						children: <Widget>[
 							Expanded(
-								child: _buildExpenseSummaryCard(
-									label: 'Today Expense',
-									amount: _todayExpenseTotal,
+								child: SizedBox(
+									height: 56,
+									child: FilledButton(
+										onPressed: () => Navigator.of(context).pushNamed(
+											AppRoutes.addExpense,
+										),
+										style: FilledButton.styleFrom(
+											backgroundColor: const Color(0xFF44444C),
+											foregroundColor: Colors.white,
+											textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+											shape: RoundedRectangleBorder(
+												borderRadius: BorderRadius.circular(14),
+											),
+										),
+										child: const Text('Spent'),
+									),
 								),
 							),
 							const SizedBox(width: 12),
 							Expanded(
-								child: _buildExpenseSummaryCard(
-									label: 'This Month',
-									amount: _monthExpenseTotal,
+								child: SizedBox(
+									height: 56,
+									child: FilledButton(
+										onPressed: () => Navigator.of(context).pushNamed(
+											AppRoutes.addIncome,
+										),
+										style: FilledButton.styleFrom(
+											backgroundColor: const Color(0xFF44444C),
+											foregroundColor: Colors.white,
+											textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+											shape: RoundedRectangleBorder(
+												borderRadius: BorderRadius.circular(14),
+											),
+										),
+										child: const Text('Received'),
+									),
 								),
 							),
 						],
-					),
-				),
-				Padding(
-					padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-					child: Row(
-						children: <Widget>[
-							Expanded(
-								child: FilledButton.icon(
-									onPressed: () => Navigator.of(context).pushNamed(
-										AppRoutes.addExpense,
-									),
-									icon: const Icon(Icons.remove_circle_outline),
-									label: const Text('Spent'),
-								),
-							),
-							const SizedBox(width: 12),
-							Expanded(
-								child: FilledButton.icon(
-									onPressed: () => Navigator.of(context).pushNamed(
-										AppRoutes.addIncome,
-									),
-									icon: const Icon(Icons.add_circle_outline),
-									label: const Text('Received'),
-								),
-							),
-						],
-					),
-				),
-				Padding(
-					padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-					child: Row(
-						children: <Widget>[
-							Expanded(
-								child: DropdownButtonFormField<DateFilter>(
-									value: _dateFilter,
-									decoration: const InputDecoration(
-										labelText: 'Filter',
-										border: OutlineInputBorder(),
-									),
-									onChanged: (DateFilter? value) {
-										if (value == null) {
-											return;
-										}
-										setState(() {
-											_dateFilter = value;
-											if (value != DateFilter.custom) {
-												_selectedDate = null;
-											}
-										});
-									},
-									items: const <DropdownMenuItem<DateFilter>>[
-										DropdownMenuItem<DateFilter>(
-											value: DateFilter.all,
-											child: Text('All'),
-										),
-										DropdownMenuItem<DateFilter>(
-											value: DateFilter.today,
-											child: Text('Today'),
-										),
-										DropdownMenuItem<DateFilter>(
-											value: DateFilter.yesterday,
-											child: Text('Yesterday'),
-										),
-										DropdownMenuItem<DateFilter>(
-											value: DateFilter.custom,
-											child: Text('Pick date'),
-										),
-									],
-								),
-							),
-							const SizedBox(width: 12),
-							FilledButton(
-								onPressed: _dateFilter == DateFilter.custom
-									? () => _pickCustomDate(context)
-									: null,
-								child: Text(
-									_selectedDate == null
-										? 'Select'
-										: _formatDateShort(_selectedDate!),
-								),
-							),
-						],
-					),
-				),
-				Padding(
-					padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-					child: Text(
-						'Untracked SMS on top. Tracked items show from transactions.',
-						style: Theme.of(context).textTheme.bodySmall,
 					),
 				),
 				Expanded(
@@ -263,54 +200,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 						: RefreshIndicator(
 							onRefresh: _loadDashboardData,
 							child: ListView.separated(
+								padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
 								itemCount: filteredItems.length,
-								separatorBuilder: (_, _) => const Divider(height: 1),
+								separatorBuilder: (_, _) => const SizedBox(height: 10),
 								itemBuilder: (BuildContext context, int index) {
 											final DashboardItem item = filteredItems[index];
 											if (item.kind == DashboardItemKind.sms) {
 												final SmsItem sms = item.sms!;
-												return ListTile(
-													onTap: () => Navigator.of(context).push(
-													MaterialPageRoute<bool?>(
-														builder: (_) => AddExpenseScreen(
-															smsPayload: SmsPayload(
-																sender: sms.sender,
-																body: sms.body,
-																receivedAt: sms.date,
-															),
-														),
-													),
-												),
-												title: Text(
-													sms.sender,
-													maxLines: 1,
-													overflow: TextOverflow.ellipsis,
-												),
-												subtitle: Column(
-													crossAxisAlignment: CrossAxisAlignment.start,
-													children: <Widget>[
-														Text(
-															sms.body,
-															maxLines: 2,
-															overflow: TextOverflow.ellipsis,
-														),
-														const SizedBox(height: 4),
-														Text(
-															'Untracked',
-															style: TextStyle(
-																color: Theme.of(context).colorScheme.error,
-																fontWeight: FontWeight.w600,
-															),
-														),
-														const SizedBox(height: 4),
-														Text(
-															_formatDate(sms.date),
-															style: Theme.of(context).textTheme.labelMedium,
-														),
-													],
-												),
-												isThreeLine: true,
-											);
+												return _buildSmsExpenseCard(context, sms);
 											}
 
 											final TransactionItem transaction = item.transaction!;
@@ -320,47 +217,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 											final String title = transaction.categoryName ??
 												(transaction.note?.isNotEmpty == true ? transaction.note! : 'Transaction');
 
-											return ListTile(
-												onTap: () async {
-												final bool? updated = await Navigator.of(context).push(
-													MaterialPageRoute<bool>(
-														builder: (_) => TransactionDetailScreen(
-															transaction: transaction,
-														),
-													),
-												);
-												if (updated == true && context.mounted) {
-													await _loadDashboardData();
-												}
-											},
-												title: Text(
-													title,
-													maxLines: 1,
-													overflow: TextOverflow.ellipsis,
-												),
-												subtitle: Column(
-													crossAxisAlignment: CrossAxisAlignment.start,
-													children: <Widget>[
-														Text(
-															transaction.paymentMethodName ?? 'Payment method',
-														),
-														const SizedBox(height: 4),
-														Text(
-															_formatDate(transaction.transactionDate),
-															style: Theme.of(context).textTheme.labelMedium,
-														),
-													],
-												),
-												trailing: Text(
-													amountLabel,
-													style: TextStyle(
-														color: isIncome
-															? Theme.of(context).colorScheme.secondary
-															: Theme.of(context).colorScheme.error,
-														fontWeight: FontWeight.w600,
-													),
-												),
-												isThreeLine: true,
+											return _buildTransactionCard(
+												context,
+												transaction: transaction,
+												title: title,
+												amountLabel: amountLabel,
+												isIncome: isIncome,
 											);
 								},
 							),
@@ -370,93 +232,220 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		);
 	}
 
-	Widget _buildExpenseSummaryCard({
-		required String label,
-		required double amount,
-	}) {
-		return Container(
-			padding: const EdgeInsets.all(12),
-			decoration: BoxDecoration(
-				color: Theme.of(context).colorScheme.surfaceContainerHighest,
-				borderRadius: BorderRadius.circular(12),
-			),
-			child: Column(
-				crossAxisAlignment: CrossAxisAlignment.start,
-				children: <Widget>[
-					Text(
-						label,
-						style: Theme.of(context).textTheme.labelMedium,
-					),
-					const SizedBox(height: 6),
-					Text(
-						amount.toStringAsFixed(2),
-						style: Theme.of(context).textTheme.titleMedium?.copyWith(
-							fontWeight: FontWeight.w700,
+	Widget _buildSmsExpenseCard(BuildContext context, SmsItem sms) {
+		final ColorScheme scheme = Theme.of(context).colorScheme;
+		return Material(
+			color: scheme.surface,
+			borderRadius: BorderRadius.circular(16),
+			child: InkWell(
+				borderRadius: BorderRadius.circular(16),
+				onTap: () => Navigator.of(context).push(
+					MaterialPageRoute<bool?>(
+						builder: (_) => AddExpenseScreen(
+							smsPayload: SmsPayload(
+								sender: sms.sender,
+								body: sms.body,
+								receivedAt: sms.date,
+							),
 						),
 					),
-				],
+				),
+				child: Container(
+					padding: const EdgeInsets.all(14),
+					decoration: BoxDecoration(
+						borderRadius: BorderRadius.circular(16),
+						border: Border.all(color: scheme.outlineVariant),
+					),
+					child: Column(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: <Widget>[
+							Row(
+								children: <Widget>[
+									Container(
+										padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+										decoration: BoxDecoration(
+											color: scheme.errorContainer,
+											borderRadius: BorderRadius.circular(999),
+										),
+										child: Text(
+											'Untracked SMS',
+											style: Theme.of(context).textTheme.labelSmall?.copyWith(
+												color: scheme.onErrorContainer,
+												fontWeight: FontWeight.w700,
+											),
+										),
+									),
+									const Spacer(),
+									Icon(Icons.chevron_right, color: scheme.outline),
+								],
+							),
+							const SizedBox(height: 10),
+							Text(
+								sms.sender,
+								maxLines: 1,
+								overflow: TextOverflow.ellipsis,
+								style: Theme.of(context).textTheme.titleSmall?.copyWith(
+									fontWeight: FontWeight.w700,
+								),
+							),
+							const SizedBox(height: 6),
+							Text(
+								sms.body,
+								maxLines: 2,
+								overflow: TextOverflow.ellipsis,
+								style: Theme.of(context).textTheme.bodyMedium,
+							),
+							const SizedBox(height: 8),
+							Text(
+								_formatDate(sms.date),
+								style: Theme.of(context).textTheme.labelMedium,
+							),
+						],
+					),
+				),
 			),
 		);
 	}
 
-	Future<void> _pickCustomDate(BuildContext context) async {
-		final DateTime now = DateTime.now();
-		final DateTime? picked = await showDatePicker(
-			context: context,
-			initialDate: _selectedDate ?? now,
-			firstDate: DateTime(now.year - 5),
-			lastDate: DateTime(now.year + 1),
+	Widget _buildTransactionCard(
+		BuildContext context, {
+		required TransactionItem transaction,
+		required String title,
+		required String amountLabel,
+		required bool isIncome,
+	}) {
+		final ColorScheme scheme = Theme.of(context).colorScheme;
+		final Color accent = isIncome ? scheme.secondary : scheme.error;
+
+		return Material(
+			color: scheme.surface,
+			borderRadius: BorderRadius.circular(16),
+			child: InkWell(
+				borderRadius: BorderRadius.circular(16),
+				onTap: () async {
+					final bool? updated = await Navigator.of(context).push(
+						MaterialPageRoute<bool>(
+							builder: (_) => TransactionDetailScreen(
+								transaction: transaction,
+							),
+						),
+					);
+					if (updated == true && context.mounted) {
+						await _loadDashboardData();
+					}
+				},
+				child: Container(
+					padding: const EdgeInsets.all(14),
+					decoration: BoxDecoration(
+						borderRadius: BorderRadius.circular(16),
+						border: Border.all(color: scheme.outlineVariant),
+					),
+					child: Row(
+						children: <Widget>[
+							Container(
+								width: 36,
+								height: 36,
+								decoration: BoxDecoration(
+									color: accent.withOpacity(0.12),
+									borderRadius: BorderRadius.circular(10),
+								),
+								child: Icon(
+									isIncome ? Icons.south_west : Icons.north_east,
+									color: accent,
+									size: 18,
+								),
+							),
+							const SizedBox(width: 12),
+							Expanded(
+								child: Column(
+									crossAxisAlignment: CrossAxisAlignment.start,
+									children: <Widget>[
+										Text(
+											title,
+											maxLines: 1,
+											overflow: TextOverflow.ellipsis,
+											style: Theme.of(context).textTheme.titleSmall?.copyWith(
+												fontWeight: FontWeight.w700,
+											),
+										),
+										const SizedBox(height: 4),
+										Text(
+											transaction.paymentMethodName ?? 'Payment method',
+											maxLines: 1,
+											overflow: TextOverflow.ellipsis,
+											style: Theme.of(context).textTheme.bodySmall,
+										),
+										const SizedBox(height: 2),
+										Text(
+											_formatDate(transaction.transactionDate),
+											style: Theme.of(context).textTheme.labelMedium,
+										),
+									],
+								),
+							),
+							Text(
+								amountLabel,
+								style: Theme.of(context).textTheme.titleSmall?.copyWith(
+									color: accent,
+									fontWeight: FontWeight.w800,
+								),
+							),
+						],
+					),
+				),
+			),
 		);
-
-		if (picked == null) {
-			return;
-		}
-
-		setState(() {
-			_selectedDate = picked;
-			_dateFilter = DateFilter.custom;
-		});
 	}
 
+
+
 	List<DashboardItem> _applyDateFilter(List<DashboardItem> items) {
-		if (_dateFilter == DateFilter.all) {
-			return items;
-		}
-
-		final DateTime now = DateTime.now();
-		DateTime? targetDate;
-		if (_dateFilter == DateFilter.today) {
-			targetDate = DateTime(now.year, now.month, now.day);
-		} else if (_dateFilter == DateFilter.yesterday) {
-			final DateTime yesterday = now.subtract(const Duration(days: 1));
-			targetDate = DateTime(yesterday.year, yesterday.month, yesterday.day);
-		} else if (_dateFilter == DateFilter.custom) {
-			if (_selectedDate == null) {
-				return items;
-			}
-			targetDate = DateTime(
-				_selectedDate!.year,
-				_selectedDate!.month,
-				_selectedDate!.day,
-			);
-		}
-
-		if (targetDate == null) {
-			return items;
-		}
-
+		final DateTimeRange range = _getExpenseRangeDates(_expenseRange);
 		return items.where((DashboardItem item) {
 			final DateTime? itemDate = _getItemDate(item);
 			if (itemDate == null) {
 				return false;
 			}
-			final DateTime normalized = DateTime(
-				itemDate.year,
-				itemDate.month,
-				itemDate.day,
-			);
-			return normalized == targetDate;
+			return itemDate.isAtSameMomentAs(range.start) ||
+				(itemDate.isAfter(range.start) && itemDate.isBefore(range.end));
 		}).toList(growable: false);
+	}
+
+	Future<void> _handleExpenseRangeChange(ExpenseRange range) async {
+		setState(() {
+			_expenseRange = range;
+		});
+		await _loadDashboardData();
+	}
+
+	DateTimeRange _getExpenseRangeDates(ExpenseRange range) {
+		final DateTime now = DateTime.now();
+		final DateTime todayStart = DateTime(now.year, now.month, now.day);
+		switch (range) {
+			case ExpenseRange.today:
+				return DateTimeRange(
+					start: todayStart,
+					end: todayStart.add(const Duration(days: 1)),
+				);
+			case ExpenseRange.yesterday:
+				final DateTime start = todayStart.subtract(const Duration(days: 1));
+				return DateTimeRange(
+					start: start,
+					end: todayStart,
+				);
+			case ExpenseRange.past2Days:
+				final DateTime start = todayStart.subtract(const Duration(days: 1));
+				return DateTimeRange(
+					start: start,
+					end: todayStart.add(const Duration(days: 1)),
+				);
+			case ExpenseRange.past3Days:
+				final DateTime start = todayStart.subtract(const Duration(days: 2));
+				return DateTimeRange(
+					start: start,
+					end: todayStart.add(const Duration(days: 1)),
+				);
+		}
 	}
 
 	DateTime? _getItemDate(DashboardItem item) {
@@ -466,11 +455,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 		return item.transaction?.transactionDate;
 	}
 
-	String _formatDateShort(DateTime date) {
-		final String twoDigitMonth = date.month.toString().padLeft(2, '0');
-		final String twoDigitDay = date.day.toString().padLeft(2, '0');
-		return '${date.year}-$twoDigitMonth-$twoDigitDay';
-	}
 
 	String _formatDate(DateTime? date) {
 		if (date == null) {
@@ -486,12 +470,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 }
 
-enum DateFilter {
-	all,
-	today,
-	yesterday,
-	custom,
-}
 
 class DashboardItem {
 	const DashboardItem.sms({
