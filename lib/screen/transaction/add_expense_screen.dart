@@ -24,6 +24,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController _loanPrincipalController = TextEditingController();
   final TextEditingController _loanOutstandingController = TextEditingController();
   final TextEditingController _loanNoteController = TextEditingController();
+  final TextEditingController _mySplitAmountController = TextEditingController();
 
   List<Category> _categories = <Category>[];
   List<PaymentMethod> _paymentMethods = <PaymentMethod>[];
@@ -37,6 +38,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   ExtraType _extraType = ExtraType.none;
   SplitMode _splitMode = SplitMode.equal;
+  bool _includeMeInSplit = false;
   final List<SplitItemController> _splitItems = <SplitItemController>[];
 
   LoanType _loanType = LoanType.lend;
@@ -58,6 +60,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _loanPrincipalController.dispose();
     _loanOutstandingController.dispose();
     _loanNoteController.dispose();
+    _mySplitAmountController.dispose();
     for (final SplitItemController item in _splitItems) {
       item.dispose();
     }
@@ -103,10 +106,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final SmsPayload? sms = widget.smsPayload;
     if (sms == null) {
       return;
-    }
-
-    if (_noteController.text.trim().isEmpty) {
-      _noteController.text = sms.body;
     }
 
     if (_amountController.text.trim().isEmpty) {
@@ -348,19 +347,19 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   List<SplitItemInput> _buildSplitItems(double totalAmount) {
     final List<SplitItemInput> items = <SplitItemInput>[];
-    final int count = _splitItems.length;
+    final List<SplitItemController> namedItems = _splitItems
+        .where((SplitItemController item) => item.nameController.text.trim().isNotEmpty)
+        .toList(growable: false);
+    final int participantCount = namedItems.length + (_includeMeInSplit ? 1 : 0);
 
-    if (count == 0) {
+    if (participantCount == 0) {
       return items;
     }
 
-    final double equalShare = totalAmount / count;
+    final double equalShare = totalAmount / participantCount;
 
-    for (final SplitItemController item in _splitItems) {
+    for (final SplitItemController item in namedItems) {
       final String name = item.nameController.text.trim();
-      if (name.isEmpty) {
-        continue;
-      }
 
       double amount = 0;
       final double? parsed = double.tryParse(item.amountController.text.trim());
@@ -374,8 +373,20 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         SplitItemInput(
           personName: name,
           amount: amount,
-          isPayer: item.isPayer,
           settled: item.settled,
+        ),
+      );
+    }
+
+    if (_includeMeInSplit) {
+      final double? myExactAmount = double.tryParse(_mySplitAmountController.text.trim());
+      items.add(
+        SplitItemInput(
+          personName: 'Me',
+          amount: _splitMode == SplitMode.equal
+              ? equalShare
+              : ((myExactAmount != null && myExactAmount >= 0) ? myExactAmount : 0),
+          settled: true,
         ),
       );
     }
@@ -386,7 +397,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Expense')),
+      appBar: AppBar(
+        title: Text(widget.smsPayload == null ? 'Add Expense' : 'Track Expense'),
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -415,10 +428,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Widget _buildForm(BuildContext context) {
+    final SmsPayload? sms = widget.smsPayload;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
-        if (widget.smsPayload != null)
+        if (sms != null)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
@@ -527,7 +542,42 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 )
               : const Text('Save Expense'),
         ),
+        if (sms != null) ...<Widget>[
+          const SizedBox(height: 16),
+          _buildSmsDetailsCard(context, sms),
+        ],
       ],
+    );
+  }
+
+  Widget _buildSmsDetailsCard(BuildContext context, SmsPayload sms) {
+    final DateTime? receivedAt = sms.receivedAt;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'SMS Data',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text('Sender: ${sms.sender}'),
+          const SizedBox(height: 4),
+          Text('Message: ${sms.body}'),
+          if (receivedAt != null) ...<Widget>[
+            const SizedBox(height: 4),
+            Text('Received: ${receivedAt.toLocal()}'),
+          ],
+        ],
+      ),
     );
   }
 
@@ -561,6 +611,30 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           ),
         ),
         const SizedBox(height: 12),
+        CheckboxListTile(
+          value: _includeMeInSplit,
+          onChanged: (bool? value) {
+            setState(() {
+              _includeMeInSplit = value ?? false;
+            });
+          },
+          title: const Text('Include me'),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_includeMeInSplit && _splitMode == SplitMode.exact) ...<Widget>[
+          const SizedBox(height: 8),
+          TextField(
+            controller: _mySplitAmountController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'My amount (for exact mode)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 4),
         ..._splitItems.asMap().entries.map(
           (MapEntry<int, SplitItemController> entry) {
             final int index = entry.key;
@@ -602,35 +676,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: CheckboxListTile(
-                          value: item.isPayer,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              item.isPayer = value ?? false;
-                            });
-                          },
-                          title: const Text('Is payer'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                      Expanded(
-                        child: CheckboxListTile(
-                          value: item.settled,
-                          onChanged: (bool? value) {
-                            setState(() {
-                              item.settled = value ?? false;
-                            });
-                          },
-                          title: const Text('Settled'),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
+                  CheckboxListTile(
+                    value: item.settled,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        item.settled = value ?? false;
+                      });
+                    },
+                    title: const Text('Settled'),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ],
               ),
@@ -750,7 +805,6 @@ class SplitItemController {
 
   final TextEditingController nameController;
   final TextEditingController amountController;
-  bool isPayer = false;
   bool settled = false;
 
   void dispose() {

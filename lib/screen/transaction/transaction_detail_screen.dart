@@ -20,6 +20,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
 
   List<Category> _categories = <Category>[];
   List<PaymentMethod> _paymentMethods = <PaymentMethod>[];
+  List<SplitItemDetail> _splitItems = <SplitItemDetail>[];
 
   String _type = 'expense';
   int? _selectedCategoryId;
@@ -58,10 +59,13 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
           ? await _service.getIncomeCategories()
           : await _service.getExpenseCategories();
       final List<PaymentMethod> methods = await _service.getPaymentMethods();
+      final List<SplitItemDetail> splitItems =
+          await _service.getSplitItemsForTransaction(widget.transaction.id);
 
       setState(() {
         _categories = categories;
         _paymentMethods = methods;
+        _splitItems = splitItems;
         _isLoading = false;
       });
     } catch (e) {
@@ -256,6 +260,27 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
             border: OutlineInputBorder(),
           ),
         ),
+        if (_splitItems.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 20),
+          const Text('Split Details', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          ..._splitItems.map(
+            (SplitItemDetail item) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(item.personName),
+                subtitle: Text('Amount: ${item.amount.toStringAsFixed(2)}'),
+                trailing: Text(
+                  item.settled ? 'Settled' : 'Pending',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: item.settled ? Colors.green : Colors.orange,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         if (tx.smsBody != null || tx.smsSender != null) ...<Widget>[
           const SizedBox(height: 20),
           const Text('Linked SMS', style: TextStyle(fontWeight: FontWeight.w600)),

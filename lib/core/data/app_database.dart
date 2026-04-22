@@ -22,7 +22,7 @@ class AppDatabase {
 
     return openDatabase(
       fullPath,
-      version: 1,
+      version: 2,
       onConfigure: (Database db) async {
         await db.execute('PRAGMA foreign_keys = ON');
       },
@@ -90,8 +90,7 @@ CREATE TABLE split_items (
   split_transaction_id INTEGER NOT NULL,
   person_name TEXT NOT NULL,
   amount REAL NOT NULL CHECK (amount >= 0),
-  is_payer INTEGER NOT NULL DEFAULT 0,
-  settled INTEGER NOT NULL DEFAULT 0,
+  settled BOOLEAN NOT NULL DEFAULT FALSE CHECK (settled IN (0, 1)),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (split_transaction_id) REFERENCES split_transactions(id) ON DELETE CASCADE
 )

@@ -56,6 +56,18 @@ class TransactionItem {
   final DateTime? smsReceivedAt;
 }
 
+class SplitItemDetail {
+  const SplitItemDetail({
+    required this.personName,
+    required this.amount,
+    required this.settled,
+  });
+
+  final String personName;
+  final double amount;
+  final bool settled;
+}
+
 class TransactionRepository {
   TransactionRepository({AppDatabase? database})
       : _database = database ?? AppDatabase.instance;
@@ -305,6 +317,30 @@ WHERE type = 'expense'
     }
 
     await batch.commit(noResult: true);
+  }
+
+  Future<List<SplitItemDetail>> getSplitItemsByTransactionId(int transactionId) async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+SELECT si.person_name, si.amount, si.settled
+FROM split_transactions st
+INNER JOIN split_items si ON si.split_transaction_id = st.id
+WHERE st.transaction_id = ?
+ORDER BY si.id ASC
+''',
+      <Object?>[transactionId],
+    );
+
+    return rows
+        .map(
+          (Map<String, Object?> row) => SplitItemDetail(
+            personName: row['person_name'] as String,
+            amount: (row['amount'] as num).toDouble(),
+            settled: (row['settled'] as int) == 1,
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<int> insertLoanTransaction({

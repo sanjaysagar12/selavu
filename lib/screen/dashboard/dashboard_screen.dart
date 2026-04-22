@@ -239,17 +239,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 			borderRadius: BorderRadius.circular(16),
 			child: InkWell(
 				borderRadius: BorderRadius.circular(16),
-				onTap: () => Navigator.of(context).push(
-					MaterialPageRoute<bool?>(
-						builder: (_) => AddExpenseScreen(
-							smsPayload: SmsPayload(
-								sender: sms.sender,
-								body: sms.body,
-								receivedAt: sms.date,
+				onTap: () async {
+					final bool? saved = await Navigator.of(context).push<bool?>(
+						MaterialPageRoute<bool?>(
+							builder: (_) => AddExpenseScreen(
+								smsPayload: SmsPayload(
+									sender: sms.sender,
+									body: sms.body,
+									receivedAt: sms.date,
+								),
 							),
 						),
-					),
-				),
+					);
+					if (saved == true && mounted) {
+						await _loadDashboardData();
+					}
+				},
 				child: Container(
 					padding: const EdgeInsets.all(14),
 					decoration: BoxDecoration(

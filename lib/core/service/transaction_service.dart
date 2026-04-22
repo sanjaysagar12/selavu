@@ -4,13 +4,11 @@ class SplitItemInput {
   const SplitItemInput({
     required this.personName,
     required this.amount,
-    required this.isPayer,
     required this.settled,
   });
 
   final String personName;
   final double amount;
-  final bool isPayer;
   final bool settled;
 }
 
@@ -68,6 +66,10 @@ class TransactionService {
 
   Future<List<TransactionItem>> getTransactions() {
     return _repository.getTransactions();
+  }
+
+  Future<List<SplitItemDetail>> getSplitItemsForTransaction(int transactionId) {
+    return _repository.getSplitItemsByTransactionId(transactionId);
   }
 
   Future<Set<String>> getTrackedSmsHashes(List<String> hashes) {
@@ -161,7 +163,6 @@ class TransactionService {
             (SplitItemInput item) => <String, Object?>{
               'person_name': item.personName,
               'amount': item.amount,
-              'is_payer': item.isPayer ? 1 : 0,
               'settled': item.settled ? 1 : 0,
             },
           )
