@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 enum ExpenseRange {
   today,
-  yesterday,
   past2Days,
-  past3Days,
+  past4Days,
+  week,
 }
 
 class ExpenseHeroCard extends StatelessWidget {
@@ -25,154 +25,133 @@ class ExpenseHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String monthText = monthTotal.toStringAsFixed(2);
     final String rangeText = periodTotal.toStringAsFixed(2);
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: <Widget>[
-        Container(
-          width: double.infinity,
-          height: 220,
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(32),
+    
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B5E20).withAlpha(60),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          child: Column(
-            children: <Widget>[
-              const Spacer(),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Text.rich(
-                  TextSpan(
-                    children: <InlineSpan>[
-                      TextSpan(
-                        text: '₹$monthText',
-                        style: Theme.of(context)
-                            .textTheme
-                            .displayMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      TextSpan(
-                        text: '/M',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Monthly Spending',
+                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(30),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.white, size: 12),
+                    const SizedBox(width: 6),
+                    Text(
+                      _getRangeLabel(range),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-        Positioned(
-          top: 8,
-          right: 12,
-          child: Text(
-            '₹',
-            style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontSize: 220,
-                  color: scheme.onSurface.withOpacity(0.08),
-                  fontWeight: FontWeight.w700,
-                ),
+          const SizedBox(height: 8),
+          Text(
+            '₹$monthText',
+            style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
           ),
-        ),
-        Positioned(
-          top: 48,
-          right: 16,
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.settings,
-              color: scheme.onSurface,
-            ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              _buildMiniStat('Period Total', '₹$rangeText', Icons.trending_up),
+              const SizedBox(width: 24),
+              _buildMiniStat('Avg / Day', '₹${(monthTotal / 30).toStringAsFixed(0)}', Icons.analytics),
+            ],
           ),
+          const SizedBox(height: 20),
+          _buildRangeSelector(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String label, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: Colors.white54, size: 14),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+          ],
         ),
-        Positioned(
-          top: 48,
-          left: 24,
-          child: Text(
-            'This Month’s \nSpending',
-            textAlign: TextAlign.left,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 24,
-                ),
-          ),
-        ),
-        Positioned(
-          bottom: -10,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: scheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<ExpenseRange>(
-                    value: range,
-                    dropdownColor: scheme.surface,
-                    iconEnabledColor: scheme.onSecondaryContainer,
-                    iconSize: 12,
-                    icon: const Icon(Icons.arrow_drop_down, size: 12),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: scheme.onSecondaryContainer,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                    ),
-                    isDense: true,
-                    onChanged: (ExpenseRange? value) {
-                      if (value == null) {
-                        return;
-                      }
-                      onRangeChanged(value);
-                    },
-                    items: const <DropdownMenuItem<ExpenseRange>>[
-                      DropdownMenuItem<ExpenseRange>(
-                        value: ExpenseRange.today,
-                        child: Text('Today'),
-                      ),
-                      DropdownMenuItem<ExpenseRange>(
-                        value: ExpenseRange.yesterday,
-                        child: Text('Yesterday'),
-                      ),
-                      DropdownMenuItem<ExpenseRange>(
-                        value: ExpenseRange.past2Days,
-                        child: Text('Past 2 days'),
-                      ),
-                      DropdownMenuItem<ExpenseRange>(
-                        value: ExpenseRange.past3Days,
-                        child: Text('Past 3 days'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '₹$rangeText',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSecondaryContainer,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
       ],
     );
+  }
+
+  Widget _buildRangeSelector() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(40),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: ExpenseRange.values.map((r) {
+          final bool isSelected = r == range;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onRangeChanged(r),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _getRangeLabel(r),
+                  style: TextStyle(
+                    color: isSelected ? const Color(0xFF1B5E20) : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String _getRangeLabel(ExpenseRange range) {
+    switch (range) {
+      case ExpenseRange.today: return 'Today';
+      case ExpenseRange.past2Days: return '2 Days';
+      case ExpenseRange.past4Days: return '4 Days';
+      case ExpenseRange.week: return '1 Week';
+    }
   }
 }

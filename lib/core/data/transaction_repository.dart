@@ -7,21 +7,29 @@ class Category {
     required this.id,
     required this.name,
     required this.type,
+    this.icon,
+    this.color,
   });
 
   final int id;
   final String name;
   final String type;
+  final String? icon;
+  final String? color;
 }
 
 class PaymentMethod {
   const PaymentMethod({
     required this.id,
     required this.name,
+    this.icon,
+    this.color,
   });
 
   final int id;
   final String name;
+  final String? icon;
+  final String? color;
 }
 
 class TransactionItem {
@@ -35,6 +43,7 @@ class TransactionItem {
     required this.paymentMethodName,
     required this.categoryId,
     required this.paymentMethodId,
+    required this.counterparty,
     required this.smsHash,
     required this.smsSender,
     required this.smsBody,
@@ -50,6 +59,7 @@ class TransactionItem {
   final String? paymentMethodName;
   final int? categoryId;
   final int? paymentMethodId;
+  final String? counterparty;
   final String? smsHash;
   final String? smsSender;
   final String? smsBody;
@@ -59,11 +69,13 @@ class TransactionItem {
 class SplitItemDetail {
   const SplitItemDetail({
     required this.personName,
+    this.personNumber,
     required this.amount,
     required this.settled,
   });
 
   final String personName;
+  final String? personNumber;
   final double amount;
   final bool settled;
 }
@@ -91,6 +103,8 @@ class TransactionRepository {
             id: row['id'] as int,
             name: row['name'] as String,
             type: row['type'] as String,
+            icon: row['icon'] as String?,
+            color: row['color'] as String?,
           ),
         )
         .toList(growable: false);
@@ -108,6 +122,8 @@ class TransactionRepository {
           (Map<String, Object?> row) => PaymentMethod(
             id: row['id'] as int,
             name: row['name'] as String,
+            icon: row['icon'] as String?,
+            color: row['color'] as String?,
           ),
         )
         .toList(growable: false);
@@ -166,6 +182,7 @@ SELECT
   t.transaction_date,
   t.category_id,
   t.payment_method_id,
+  t.counterparty,
   t.sms_hash,
   t.sms_sender,
   t.sms_body,
@@ -190,6 +207,7 @@ ORDER BY t.transaction_date DESC
                 : DateTime.tryParse(row['transaction_date'] as String),
             categoryId: row['category_id'] as int?,
             paymentMethodId: row['payment_method_id'] as int?,
+            counterparty: row['counterparty'] as String?,
             smsHash: row['sms_hash'] as String?,
             smsSender: row['sms_sender'] as String?,
             smsBody: row['sms_body'] as String?,
@@ -209,6 +227,7 @@ ORDER BY t.transaction_date DESC
     required double amount,
     int? categoryId,
     int? paymentMethodId,
+    String? counterparty,
     String? note,
   }) async {
     final Database db = await _database.database;
@@ -220,6 +239,7 @@ ORDER BY t.transaction_date DESC
         'amount': amount,
         'category_id': categoryId,
         'payment_method_id': paymentMethodId,
+        'counterparty': counterparty,
         'note': note,
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -259,6 +279,7 @@ WHERE type = 'expense'
     required double amount,
     int? categoryId,
     int? paymentMethodId,
+    String? counterparty,
     String? note,
     DateTime? transactionDate,
     String? smsHash,
@@ -273,6 +294,7 @@ WHERE type = 'expense'
       'amount': amount,
       'category_id': categoryId,
       'payment_method_id': paymentMethodId,
+      'counterparty': counterparty,
       'note': note,
       'transaction_date': (transactionDate ?? DateTime.now()).toIso8601String(),
       'sms_hash': smsHash,
@@ -323,7 +345,7 @@ WHERE type = 'expense'
     final Database db = await _database.database;
     final List<Map<String, Object?>> rows = await db.rawQuery(
       '''
-SELECT si.person_name, si.amount, si.settled
+SELECT si.person_name, si.person_number, si.amount, si.settled
 FROM split_transactions st
 INNER JOIN split_items si ON si.split_transaction_id = st.id
 WHERE st.transaction_id = ?
@@ -336,6 +358,7 @@ ORDER BY si.id ASC
         .map(
           (Map<String, Object?> row) => SplitItemDetail(
             personName: row['person_name'] as String,
+            personNumber: row['person_number'] as String?,
             amount: (row['amount'] as num).toDouble(),
             settled: (row['settled'] as int) == 1,
           ),
@@ -346,6 +369,7 @@ ORDER BY si.id ASC
   Future<int> insertLoanTransaction({
     required int? transactionId,
     required String personName,
+    String? personNumber,
     required String loanType,
     required double principalAmount,
     required double outstandingAmount,
@@ -356,11 +380,21 @@ ORDER BY si.id ASC
     return db.insert('loan_transactions', <String, Object?>{
       'transaction_id': transactionId,
       'person_name': personName,
+      'person_number': personNumber,
       'loan_type': loanType,
       'principal_amount': principalAmount,
       'outstanding_amount': outstandingAmount,
       'note': note,
       'status': status,
     });
+  }
+
+  Future<int> deleteTransaction(int id) async {
+    final Database db = await _database.database;
+    return db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: <Object?>[id],
+    );
   }
 }

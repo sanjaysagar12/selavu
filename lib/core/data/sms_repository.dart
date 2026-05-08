@@ -1,5 +1,6 @@
 import 'package:another_telephony/telephony.dart';
 import 'package:selavu/core/service/sms_service.dart';
+import 'package:selavu/core/util/sms_parser.dart';
 
 class SmsItem {
   const SmsItem({
@@ -18,40 +19,6 @@ class SmsRepository {
   SmsRepository({SmsService? service}) : _service = service ?? SmsService();
 
   final SmsService _service;
-
-  static const List<String> _bankSenderHints = <String>[
-    'HDFC',
-    'SBI',
-    'ICICI',
-    'AXIS',
-    'KOTAK',
-    'IDFC',
-    'YESBNK',
-    'PNB',
-    'CANBNK',
-    'BOB',
-    'CITI',
-    'INDUS',
-  ];
-
-  static const List<String> _transactionKeywords = <String>[
-    'debited',
-    'credited',
-    'debit',
-    'credit',
-    'withdrawn',
-    'withdrawal',
-    'spent',
-    'txn',
-    'transaction',
-    'a/c',
-    'account',
-    'balance',
-    'upi',
-    'neft',
-    'imps',
-    'rtgs',
-  ];
 
   Future<List<SmsItem>> getInboxSms() async {
     if (!_service.isAndroid) {
@@ -86,16 +53,6 @@ class SmsRepository {
   }
 
   bool _isBankTransactionSms(SmsItem item) {
-    final String sender = item.sender.toUpperCase();
-    final String body = item.body.toLowerCase();
-
-    final bool senderLooksLikeBank =
-        _bankSenderHints.any((String hint) => sender.contains(hint));
-    final bool containsTransactionText =
-        _transactionKeywords.any((String keyword) => body.contains(keyword));
-    final bool containsAmount =
-        body.contains('inr') || body.contains('rs.') || body.contains('rs ');
-
-    return containsTransactionText && (senderLooksLikeBank || containsAmount);
+    return SmsParser.isBankTransaction(item.sender, item.body);
   }
 }

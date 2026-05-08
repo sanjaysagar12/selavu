@@ -3,11 +3,13 @@ import 'package:selavu/core/data/transaction_repository.dart';
 class SplitItemInput {
   const SplitItemInput({
     required this.personName,
+    this.personNumber,
     required this.amount,
     required this.settled,
   });
 
   final String personName;
+  final String? personNumber;
   final double amount;
   final bool settled;
 }
@@ -27,6 +29,7 @@ class SplitTransactionInput {
 class LoanTransactionInput {
   const LoanTransactionInput({
     required this.personName,
+    this.personNumber,
     required this.loanType,
     required this.principalAmount,
     required this.outstandingAmount,
@@ -35,6 +38,7 @@ class LoanTransactionInput {
   });
 
   final String personName;
+  final String? personNumber;
   final String loanType;
   final double principalAmount;
   final double outstandingAmount;
@@ -44,7 +48,7 @@ class LoanTransactionInput {
 
 class TransactionService {
   TransactionService({TransactionRepository? repository})
-      : _repository = repository ?? TransactionRepository();
+    : _repository = repository ?? TransactionRepository();
 
   final TransactionRepository _repository;
 
@@ -103,6 +107,7 @@ class TransactionService {
     required double amount,
     int? categoryId,
     int? paymentMethodId,
+    String? counterparty,
     String? note,
   }) {
     _validateAmount(amount);
@@ -112,6 +117,7 @@ class TransactionService {
       amount: amount,
       categoryId: categoryId,
       paymentMethodId: paymentMethodId,
+      counterparty: counterparty,
       note: note,
     );
   }
@@ -129,6 +135,7 @@ class TransactionService {
     required double amount,
     int? categoryId,
     int? paymentMethodId,
+    String? counterparty,
     String? note,
     String? smsHash,
     String? smsSender,
@@ -144,6 +151,7 @@ class TransactionService {
       amount: amount,
       categoryId: categoryId,
       paymentMethodId: paymentMethodId,
+      counterparty: counterparty,
       note: note,
       smsHash: smsHash,
       smsSender: smsSender,
@@ -162,6 +170,7 @@ class TransactionService {
           .map(
             (SplitItemInput item) => <String, Object?>{
               'person_name': item.personName,
+              'person_number': item.personNumber,
               'amount': item.amount,
               'settled': item.settled ? 1 : 0,
             },
@@ -180,6 +189,7 @@ class TransactionService {
       await _repository.insertLoanTransaction(
         transactionId: transactionId,
         personName: loan.personName,
+        personNumber: loan.personNumber,
         loanType: loan.loanType,
         principalAmount: loan.principalAmount,
         outstandingAmount: loan.outstandingAmount,
@@ -202,7 +212,12 @@ class TransactionService {
     required double amount,
     int? categoryId,
     int? paymentMethodId,
+    String? counterparty,
     String? note,
+    String? smsHash,
+    String? smsSender,
+    String? smsBody,
+    DateTime? smsReceivedAt,
   }) {
     _validateAmount(amount);
     return _repository.insertTransaction(
@@ -210,8 +225,17 @@ class TransactionService {
       amount: amount,
       categoryId: categoryId,
       paymentMethodId: paymentMethodId,
+      counterparty: counterparty,
       note: note,
+      smsHash: smsHash,
+      smsSender: smsSender,
+      smsBody: smsBody,
+      smsReceivedAt: smsReceivedAt,
     );
+  }
+
+  Future<int> deleteTransaction(int id) {
+    return _repository.deleteTransaction(id);
   }
 
   void _validateAmount(double amount) {
