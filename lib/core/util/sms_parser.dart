@@ -12,6 +12,7 @@ class SmsParser {
     'BOB',
     'CITI',
     'INDUS',
+    'KVB',
   ];
 
   static const List<String> transactionKeywords = <String>[
@@ -110,30 +111,49 @@ class SmsParser {
   }
 
   static String? extractCounterparty(String body, bool isCredit) {
-    final RegExp creditRegex = RegExp(
-      r'(?:received|credited|transfer.*)?\s+from\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:on|via|ref|upi|using|info|for|[\.]+)|$|info)',
+    final String normalized = body.replaceAll('\n', ' ');
+
+    // Pattern 1: Look for names after "from" or "to" or "for"
+    // Use lookaheads for common separators like "on", "info", "via", "at", "debit", "credit"
+    final RegExp fromRegex = RegExp(
+      r'\bfrom\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:on|at|via|info|ref|upi|using|for|is|[\.]|:)|$)',
       caseSensitive: false,
     );
-    final RegExp debitRegex = RegExp(
-      r'(?:paid|sent|transfer.*|debited.*)?\s+to\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:on|via|ref|upi|using|info|for|[\.]+)|$|info)',
+    final RegExp toRegex = RegExp(
+      r'\bto\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:on|at|via|info|ref|upi|using|for|is|[\.]|:)|$)',
       caseSensitive: false,
     );
     final RegExp forRegex = RegExp(
-      r'for\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:debit|credit|is|on|via|ref|upi|using|info|for|[\.]+)|$|info)',
+      r'\bfor\s+([A-Za-z0-9\s&@\-_]+?)(?=\s+(?:on|at|via|info|ref|upi|using|for|is|debit|credit|[\.]|:)|$)',
       caseSensitive: false,
     );
 
-    final RegExpMatch? forMatch = forRegex.firstMatch(body);
-    if (forMatch != null) {
-      return forMatch.group(1)?.trim();
+    // Order of priority: 
+    // 1. If credit, "from" is strongest
+    // 2. If debit, "to" is strongest
+    // 3. "for" as fallback for merchant names
+    
+    if (isCredit) {
+      final match = fromRegex.firstMatch(normalized);
+      if (match != null) return match.group(1)?.trim();
+    } else {
+      final match = toRegex.firstMatch(normalized);
+      if (match != null) return match.group(1)?.trim();
     }
 
+    // Fallbacks
+    final forMatch = forRegex.firstMatch(normalized);
+    if (forMatch != null) return forMatch.group(1)?.trim();
+
+    // Last resort: try the other direction
     if (isCredit) {
-      final RegExpMatch? match = creditRegex.firstMatch(body);
-      return match?.group(1)?.trim();
+      final match = toRegex.firstMatch(normalized);
+      if (match != null) return match.group(1)?.trim();
     } else {
-      final RegExpMatch? match = debitRegex.firstMatch(body);
-      return match?.group(1)?.trim();
+      final match = fromRegex.firstMatch(normalized);
+      if (match != null) return match.group(1)?.trim();
     }
+
+    return null;
   }
 }
