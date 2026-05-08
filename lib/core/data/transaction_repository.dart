@@ -397,4 +397,72 @@ ORDER BY si.id ASC
       whereArgs: <Object?>[id],
     );
   }
+
+  // --- Category Management ---
+
+  Future<List<Category>> getAllCategories() async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.query(
+      'categories',
+      orderBy: 'name ASC',
+    );
+    return rows.map((row) => Category(
+      id: row['id'] as int,
+      name: row['name'] as String,
+      type: row['type'] as String,
+      icon: row['icon'] as String?,
+      color: row['color'] as String?,
+    )).toList();
+  }
+
+  Future<int> insertCategory(String name, String type, String? icon, String? color) async {
+    final Database db = await _database.database;
+    return db.insert('categories', {
+      'name': name,
+      'type': type,
+      'icon': icon,
+      'color': color,
+    });
+  }
+
+  Future<int> updateCategory(int id, String name, String type, String? icon, String? color) async {
+    final Database db = await _database.database;
+    return db.update(
+      'categories',
+      {'name': name, 'type': type, 'icon': icon, 'color': color},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deleteCategory(int id) async {
+    final Database db = await _database.database;
+    return db.delete('categories', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Payment Method Management ---
+
+  Future<int> insertPaymentMethod(String name, String? icon, String? color) async {
+    final Database db = await _database.database;
+    return db.insert('payment_methods', {
+      'name': name,
+      'icon': icon,
+      'color': color,
+    });
+  }
+
+  Future<int> updatePaymentMethod(int id, String name, String? icon, String? color) async {
+    final Database db = await _database.database;
+    return db.update(
+      'payment_methods',
+      {'name': name, 'icon': icon, 'color': color},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deletePaymentMethod(int id) async {
+    final Database db = await _database.database;
+    return db.delete('payment_methods', where: 'id = ?', whereArgs: [id]);
+  }
 }

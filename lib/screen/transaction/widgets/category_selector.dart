@@ -65,28 +65,55 @@ class CategorySelector extends StatelessWidget {
     final Category? selected = await showModalBottomSheet<Category>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (BuildContext sheetContext) {
-        return SafeArea(
-          child: ListView(
-            children: categories
-                .map(
-                  (Category category) {
-                    final Color catColor = UIUtil.hexToColor(category.color);
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: catColor.withOpacity(0.15),
-                        child: Icon(
-                          UIUtil.getIconData(category.icon),
-                          color: catColor,
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(category.name),
-                      onTap: () => Navigator.of(sheetContext).pop(category),
-                    );
-                  },
-                )
-                .toList(growable: false),
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Select Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.pushNamed(context, '/manage-categories');
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView(
+                  children: categories
+                      .map(
+                        (Category category) {
+                          final Color catColor = UIUtil.hexToColor(category.color);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: catColor.withOpacity(0.15),
+                              child: Icon(
+                                UIUtil.getIconData(category.icon),
+                                color: catColor,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(category.name),
+                            onTap: () => Navigator.of(sheetContext).pop(category),
+                          );
+                        },
+                      )
+                      .toList(growable: false),
+                ),
+              ),
+            ],
           ),
         );
       },

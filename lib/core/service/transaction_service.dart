@@ -238,6 +238,17 @@ class TransactionService {
     return _repository.deleteTransaction(id);
   }
 
+  // --- Category Management ---
+  Future<List<Category>> getAllCategories() => _repository.getAllCategories();
+  Future<int> addCategory({required String name, required String type, String? icon, String? color}) => _repository.insertCategory(name, type, icon, color);
+  Future<int> updateCategory({required int id, required String name, required String type, String? icon, String? color}) => _repository.updateCategory(id, name, type, icon, color);
+  Future<int> deleteCategory(int id) => _repository.deleteCategory(id);
+
+  // --- Payment Method Management ---
+  Future<int> addPaymentMethodWithDetails({required String name, String? icon, String? color}) => _repository.insertPaymentMethod(name, icon, color);
+  Future<int> updatePaymentMethod({required int id, required String name, String? icon, String? color}) => _repository.updatePaymentMethod(id, name, icon, color);
+  Future<int> deletePaymentMethod(int id) => _repository.deletePaymentMethod(id);
+
   void _validateAmount(double amount) {
     if (amount <= 0) {
       throw ArgumentError('Amount must be greater than zero.');

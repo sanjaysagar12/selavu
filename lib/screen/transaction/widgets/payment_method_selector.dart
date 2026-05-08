@@ -67,28 +67,55 @@ class PaymentMethodSelector extends StatelessWidget {
     final PaymentMethod? selected = await showModalBottomSheet<PaymentMethod>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (BuildContext sheetContext) {
-        return SafeArea(
-          child: ListView(
-            children: paymentMethods
-                .map(
-                  (PaymentMethod method) {
-                    final Color methodColor = UIUtil.hexToColor(method.color);
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: methodColor.withOpacity(0.15),
-                        child: Icon(
-                          UIUtil.getIconData(method.icon, defaultIcon: Icons.account_balance_wallet),
-                          color: methodColor,
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(method.name),
-                      onTap: () => Navigator.of(sheetContext).pop(method),
-                    );
-                  },
-                )
-                .toList(growable: false),
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        Navigator.pushNamed(context, '/manage-payment-methods');
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView(
+                  children: paymentMethods
+                      .map(
+                        (PaymentMethod method) {
+                          final Color methodColor = UIUtil.hexToColor(method.color);
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: methodColor.withOpacity(0.15),
+                              child: Icon(
+                                UIUtil.getIconData(method.icon, defaultIcon: Icons.account_balance_wallet),
+                                color: methodColor,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(method.name),
+                            onTap: () => Navigator.of(sheetContext).pop(method),
+                          );
+                        },
+                      )
+                      .toList(growable: false),
+                ),
+              ),
+            ],
           ),
         );
       },
