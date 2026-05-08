@@ -634,6 +634,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             onPaymentMethodSelected: (m) =>
                 setState(() => _selectedPaymentMethodId = m.id),
             onAddPaymentMethod: _promptAddPaymentMethod,
+            onRefresh: _loadLookups,
           ),
         ),
         const SizedBox(height: 16),
@@ -653,6 +654,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
             selectedCategoryId: _selectedCategoryId,
             onCategorySelected: (cat) =>
                 setState(() => _selectedCategoryId = cat.id),
+            onRefresh: _loadLookups,
           ),
         ),
         const SizedBox(height: 16),

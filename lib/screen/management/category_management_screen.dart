@@ -211,6 +211,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        actions: [
+          IconButton(
+            onPressed: () => _showAddEditDialog(),
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add Category',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -285,13 +293,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddEditDialog(),
-        label: const Text('Add Category', style: TextStyle(fontWeight: FontWeight.bold)),
-        icon: const Icon(Icons.add),
-        backgroundColor: const Color(0xFF1B5E20),
-        foregroundColor: Colors.white,
-      ),
     );
   }
 }

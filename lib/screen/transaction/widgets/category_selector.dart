@@ -8,11 +8,13 @@ class CategorySelector extends StatelessWidget {
     required this.categories,
     required this.selectedCategoryId,
     required this.onCategorySelected,
+    this.onRefresh,
   });
 
   final List<Category> categories;
   final int? selectedCategoryId;
   final ValueChanged<Category> onCategorySelected;
+  final VoidCallback? onRefresh;
 
   Category? get _selectedCategory {
     if (selectedCategoryId == null) return null;
@@ -60,8 +62,6 @@ class CategorySelector extends StatelessWidget {
   }
 
   Future<void> _showCategoryPicker(BuildContext context) async {
-    if (categories.isEmpty) return;
-
     final Category? selected = await showModalBottomSheet<Category>(
       context: context,
       showDragHandle: true,
@@ -79,9 +79,10 @@ class CategorySelector extends StatelessWidget {
                   children: [
                     const Text('Select Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     TextButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(sheetContext);
-                        Navigator.pushNamed(context, '/manage-categories');
+                        await Navigator.pushNamed(context, '/manage-categories');
+                        if (onRefresh != null) onRefresh!();
                       },
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       label: const Text('Edit'),
@@ -90,29 +91,35 @@ class CategorySelector extends StatelessWidget {
                 ),
               ),
               const Divider(),
-              Expanded(
-                child: ListView(
-                  children: categories
-                      .map(
-                        (Category category) {
-                          final Color catColor = UIUtil.hexToColor(category.color);
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: catColor.withOpacity(0.15),
-                              child: Icon(
-                                UIUtil.getIconData(category.icon),
-                                color: catColor,
-                                size: 20,
+              if (categories.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No categories found. Add some by clicking Edit.', textAlign: TextAlign.center),
+                )
+              else
+                Expanded(
+                  child: ListView(
+                    children: categories
+                        .map(
+                          (Category category) {
+                            final Color catColor = UIUtil.hexToColor(category.color);
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: catColor.withOpacity(0.15),
+                                child: Icon(
+                                  UIUtil.getIconData(category.icon),
+                                  color: catColor,
+                                  size: 20,
+                                ),
                               ),
-                            ),
-                            title: Text(category.name),
-                            onTap: () => Navigator.of(sheetContext).pop(category),
-                          );
-                        },
-                      )
-                      .toList(growable: false),
+                              title: Text(category.name),
+                              onTap: () => Navigator.of(sheetContext).pop(category),
+                            );
+                          },
+                        )
+                        .toList(growable: false),
+                  ),
                 ),
-              ),
             ],
           ),
         );

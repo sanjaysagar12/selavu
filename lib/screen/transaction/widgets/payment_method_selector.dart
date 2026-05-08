@@ -9,12 +9,14 @@ class PaymentMethodSelector extends StatelessWidget {
     required this.selectedPaymentMethodId,
     required this.onPaymentMethodSelected,
     this.onAddPaymentMethod,
+    this.onRefresh,
   });
 
   final List<PaymentMethod> paymentMethods;
   final int? selectedPaymentMethodId;
   final ValueChanged<PaymentMethod> onPaymentMethodSelected;
   final VoidCallback? onAddPaymentMethod;
+  final VoidCallback? onRefresh;
 
   PaymentMethod? get _selectedMethod {
     if (selectedPaymentMethodId == null) return null;
@@ -62,8 +64,6 @@ class PaymentMethodSelector extends StatelessWidget {
   }
 
   Future<void> _showPaymentMethodPicker(BuildContext context) async {
-    if (paymentMethods.isEmpty) return;
-
     final PaymentMethod? selected = await showModalBottomSheet<PaymentMethod>(
       context: context,
       showDragHandle: true,
@@ -81,9 +81,10 @@ class PaymentMethodSelector extends StatelessWidget {
                   children: [
                     const Text('Select Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     TextButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(sheetContext);
-                        Navigator.pushNamed(context, '/manage-payment-methods');
+                        await Navigator.pushNamed(context, '/manage-payment-methods');
+                        if (onRefresh != null) onRefresh!();
                       },
                       icon: const Icon(Icons.edit_outlined, size: 18),
                       label: const Text('Edit'),
@@ -92,29 +93,35 @@ class PaymentMethodSelector extends StatelessWidget {
                 ),
               ),
               const Divider(),
-              Expanded(
-                child: ListView(
-                  children: paymentMethods
-                      .map(
-                        (PaymentMethod method) {
-                          final Color methodColor = UIUtil.hexToColor(method.color);
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: methodColor.withOpacity(0.15),
-                              child: Icon(
-                                UIUtil.getIconData(method.icon, defaultIcon: Icons.account_balance_wallet),
-                                color: methodColor,
-                                size: 20,
+              if (paymentMethods.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text('No payment methods found. Add some by clicking Edit.', textAlign: TextAlign.center),
+                )
+              else
+                Expanded(
+                  child: ListView(
+                    children: paymentMethods
+                        .map(
+                          (PaymentMethod method) {
+                            final Color methodColor = UIUtil.hexToColor(method.color);
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: methodColor.withOpacity(0.15),
+                                child: Icon(
+                                  UIUtil.getIconData(method.icon, defaultIcon: Icons.account_balance_wallet),
+                                  color: methodColor,
+                                  size: 20,
+                                ),
                               ),
-                            ),
-                            title: Text(method.name),
-                            onTap: () => Navigator.of(sheetContext).pop(method),
-                          );
-                        },
-                      )
-                      .toList(growable: false),
+                              title: Text(method.name),
+                              onTap: () => Navigator.of(sheetContext).pop(method),
+                            );
+                          },
+                        )
+                        .toList(growable: false),
+                  ),
                 ),
-              ),
             ],
           ),
         );
