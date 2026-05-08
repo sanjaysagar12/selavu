@@ -80,6 +80,36 @@ class SplitItemDetail {
   final bool settled;
 }
 
+class CategoryBreakdown {
+  final String name;
+  final String? icon;
+  final String? color;
+  final double total;
+  final double percentage;
+
+  const CategoryBreakdown({
+    required this.name,
+    this.icon,
+    this.color,
+    required this.total,
+    required this.percentage,
+  });
+}
+
+class PaymentMethodBreakdown {
+  final String name;
+  final String? icon;
+  final String? color;
+  final double total;
+
+  const PaymentMethodBreakdown({
+    required this.name,
+    this.icon,
+    this.color,
+    required this.total,
+  });
+}
+
 class TransactionRepository {
   TransactionRepository({AppDatabase? database})
       : _database = database ?? AppDatabase.instance;
@@ -387,6 +417,84 @@ ORDER BY si.id ASC
       'note': note,
       'status': status,
     });
+  }
+
+  Future<double> getIncomeTotalBetween({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND transaction_date >= ? AND transaction_date < ?',
+      <Object?>['income', start.toIso8601String(), end.toIso8601String()],
+    );
+
+    if (rows.isEmpty || rows.first['total'] == null) {
+      return 0.0;
+    }
+
+    return (rows.first['total'] as num).toDouble();
+  }
+
+  Future<List<CategoryBreakdown>> getCategoryBreakdown({
+    required String type,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final Database db = await _database.database;
+    
+    // Get total for the period to calculate percentage
+    final totalRows = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM transactions WHERE type = ? AND transaction_date >= ? AND transaction_date < ?',
+      <Object?>[type, start.toIso8601String(), end.toIso8601String()],
+    );
+    final double grandTotal = (totalRows.first['total'] as num?)?.toDouble() ?? 0.0;
+    if (grandTotal == 0) return [];
+
+    final List<Map<String, Object?>> rows = await db.rawQuery('''
+      SELECT c.name, c.icon, c.color, SUM(t.amount) as total
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE t.type = ? AND t.transaction_date >= ? AND t.transaction_date < ?
+      GROUP BY t.category_id
+      ORDER BY total DESC
+    ''', [type, start.toIso8601String(), end.toIso8601String()]);
+
+    return rows.map((row) {
+      final double total = (row['total'] as num).toDouble();
+      return CategoryBreakdown(
+        name: row['name'] as String? ?? 'Uncategorized',
+        icon: row['icon'] as String?,
+        color: row['color'] as String?,
+        total: total,
+        percentage: total / grandTotal,
+      );
+    }).toList();
+  }
+
+  Future<List<PaymentMethodBreakdown>> getPaymentMethodBreakdown({
+    required String type,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final Database db = await _database.database;
+    final List<Map<String, Object?>> rows = await db.rawQuery('''
+      SELECT p.name, p.icon, p.color, SUM(t.amount) as total
+      FROM transactions t
+      LEFT JOIN payment_methods p ON t.payment_method_id = p.id
+      WHERE t.type = ? AND t.transaction_date >= ? AND t.transaction_date < ?
+      GROUP BY t.payment_method_id
+      ORDER BY total DESC
+    ''', [type, start.toIso8601String(), end.toIso8601String()]);
+
+    return rows.map((row) {
+      return PaymentMethodBreakdown(
+        name: row['name'] as String? ?? 'Unknown Method',
+        icon: row['icon'] as String?,
+        color: row['color'] as String?,
+        total: (row['total'] as num).toDouble(),
+      );
+    }).toList();
   }
 
   Future<int> deleteTransaction(int id) async {

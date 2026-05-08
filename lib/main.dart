@@ -2,6 +2,7 @@ import 'package:another_telephony/telephony.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:selavu/core/model/sms_payload.dart';
 import 'package:selavu/core/util/sms_parser.dart';
 
@@ -112,25 +113,47 @@ void _handleSmsPayload(String payload) {
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
+  static void initSmsListener() {
+    final _MyAppState? state = navigatorKey.currentContext?.findAncestorStateOfType<_MyAppState>();
+    state?._initSmsListener();
+  }
+
   @override
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static const MethodChannel _channel = MethodChannel('com.example.selavu/sms');
+  bool _isListening = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initSmsListener();
     _checkPendingSms();
   }
 
-  Future<void> _initSmsListener() async {
-    final Telephony telephony = Telephony.instance;
-    final bool? permissionsGranted = await telephony.requestPhoneAndSmsPermissions;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-    if (permissionsGranted == true) {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Re-check permissions and init listener if granted
+      _initSmsListener();
+    }
+  }
+
+  Future<void> _initSmsListener() async {
+    if (_isListening) return;
+
+    final status = await Permission.sms.status;
+    if (status.isGranted) {
+      final Telephony telephony = Telephony.instance;
       telephony.listenIncomingSms(
         onNewMessage: (SmsMessage message) {
           final String? body = message.body;
@@ -143,6 +166,7 @@ class _MyAppState extends State<MyApp> {
         },
         onBackgroundMessage: backgroundMessageHandler,
       );
+      setState(() => _isListening = true);
     }
   }
 

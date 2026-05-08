@@ -114,6 +114,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             onRangeChanged: _handleExpenseRangeChange,
                           ),
                         ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: InkWell(
+                              onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey.withAlpha(20)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE8F5E9),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(Icons.analytics_outlined, color: Color(0xFF1B5E20), size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'View Detailed Analytics',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    ),
+                                    const Spacer(),
+                                    const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                         SliverToBoxAdapter(child: _buildActionButtons()),
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),

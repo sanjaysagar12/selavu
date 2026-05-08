@@ -248,6 +248,11 @@ class TransactionService {
   Future<int> addPaymentMethodWithDetails({required String name, String? icon, String? color}) => _repository.insertPaymentMethod(name, icon, color);
   Future<int> updatePaymentMethod({required int id, required String name, String? icon, String? color}) => _repository.updatePaymentMethod(id, name, icon, color);
   Future<int> deletePaymentMethod(int id) => _repository.deletePaymentMethod(id);
+  
+  // --- Analytics ---
+  Future<double> getIncomeTotalBetween({required DateTime start, required DateTime end}) => _repository.getIncomeTotalBetween(start: start, end: end);
+  Future<List<CategoryBreakdown>> getCategoryBreakdown({required String type, required DateTime start, required DateTime end}) => _repository.getCategoryBreakdown(type: type, start: start, end: end);
+  Future<List<PaymentMethodBreakdown>> getPaymentMethodBreakdown({required String type, required DateTime start, required DateTime end}) => _repository.getPaymentMethodBreakdown(type: type, start: start, end: end);
 
   void _validateAmount(double amount) {
     if (amount <= 0) {
